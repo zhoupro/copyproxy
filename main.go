@@ -39,17 +39,28 @@ func main() {
 func handleRequest(conn net.Conn) {
     defer conn.Close()
     buf := make([]byte, 4096)
-    _,err := conn.Read(buf)
+    reqLen,err := conn.Read(buf)
     if err != nil{
         fmt.Println("error reading:", err.Error())
     }
 
     sysType := runtime.GOOS
     if sysType == "windows"{
-        d := exec.Command("cmd","/c","echo",string(buf), "|","clip")
-        d.Run()
+        fmt.Println(string(buf[:reqLen]))
+        wincopy(string(buf[:reqLen]))
     }
 
     conn.Write([]byte("Message received."))
 }
 
+func wincopy(str string) {
+    cmd1 := exec.Command("cmd", "/c","echo", str)
+    cmd2 := exec.Command("cmd", "/c","clip")
+    cmd2.Stdout = os.Stdout
+    in, _ := cmd2.StdinPipe()
+    cmd1.Stdout = in
+    cmd2.Start()
+    cmd1.Run()
+    in.Close()
+    cmd2.Wait()
+}
