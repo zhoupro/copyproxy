@@ -5,8 +5,8 @@ import (
     "fmt"
     "net"
     "os"
-    "runtime"
     "os/exec"
+    "io"
 )
 
 const (
@@ -38,29 +38,24 @@ func main() {
 
 func handleRequest(conn net.Conn) {
     defer conn.Close()
-    buf := make([]byte, 4096)
-    reqLen,err := conn.Read(buf)
-    if err != nil{
-        fmt.Println("error reading:", err.Error())
+    cmd := exec.Command("cmd", "/c","clip")
+    stdin, err := cmd.StdinPipe()
+    if err != nil {
+        fmt.Println("Error pipe init:", err)
+        os.Exit(1)
     }
-
-    sysType := runtime.GOOS
-    if sysType == "windows"{
-        fmt.Println(string(buf[:reqLen]))
-        wincopy(string(buf[:reqLen]))
+    if  err = cmd.Start();err != nil {
+        fmt.Println("Error process start:", err)
+        os.Exit(1)
     }
-
-    conn.Write([]byte("Message received."))
-}
-
-func wincopy(str string) {
-    cmd1 := exec.Command("cmd", "/c","echo", str)
-    cmd2 := exec.Command("cmd", "/c","clip")
-    cmd2.Stdout = os.Stdout
-    in, _ := cmd2.StdinPipe()
-    cmd1.Stdout = in
-    cmd2.Start()
-    cmd1.Run()
-    in.Close()
-    cmd2.Wait()
+    if copied ,err := io.Copy(stdin,conn); err !=nil{
+        fmt.Println("Error pipe copy:", err)
+        os.Exit(1)
+    }else{
+        fmt.Println("copied:", copied)
+    }
+    stdin.Close()
+    if err = cmd.Wait();err!=nil{
+        fmt.Println("Error wait:", err)
+    }
 }
