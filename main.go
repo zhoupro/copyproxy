@@ -1,61 +1,73 @@
-// Package main provides ...
 package main
 
 import (
+	"crypto/md5"
+	"encoding/json"
 	"fmt"
-	"io"
-	"net"
-	"os"
-	"os/exec"
-)
+	"io/ioutil"
+	"net/http"
 
-const (
-	CONN_HOST string = "0.0.0.0"
-	CONN_PORT string = "8377"
-	CONN_TYPE string = "tcp"
+	clip "github.com/atotto/clipboard"
+	"github.com/skanehira/clipboard-image"
+	"github.com/skratchdot/open-golang/open"
 )
 
 func main() {
-	// Listen
-	l, err := net.Listen(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
-	if err != nil {
-		fmt.Println("Error listening:", err.Error())
-		os.Exit(1)
-	}
-	defer l.Close()
-	fmt.Println("Listening on " + CONN_HOST + ":" + CONN_PORT)
-
-	for {
-		// listen for an incoming connection
-		conn, err := l.Accept()
-		if err != nil {
-			fmt.Println("Error accetping:", err.Error())
-			os.Exit(1)
-		}
-		go handleRequest(conn)
-	}
+	http.HandleFunc("/getimg", GetImg)
+	http.HandleFunc("/setclip", SetClip)
+	http.HandleFunc("/openurl", OpenUrl)
+	http.ListenAndServe(":8377", nil)
 }
 
-func handleRequest(conn net.Conn) {
-	defer conn.Close()
-	cmd := exec.Command("xclip", "-selection", "c")
-	stdin, err := cmd.StdinPipe()
+func GetImg(w http.ResponseWriter, req *http.Request) {
+	buf, err := clipboard.ReadFromClipboard()
 	if err != nil {
-		fmt.Println("Error pipe init:", err)
-		os.Exit(1)
+		w.Write([]byte("noimg"))
+		return
 	}
-	if err = cmd.Start(); err != nil {
-		fmt.Println("Error process start:", err)
-		os.Exit(1)
+	img, err := ioutil.ReadAll(buf)
+	if err != nil {
+		w.Write([]byte("noimg"))
+		return
 	}
-	if copied, err := io.Copy(stdin, conn); err != nil {
-		fmt.Println("Error pipe copy:", err)
-		os.Exit(1)
-	} else {
-		fmt.Println("copied:", copied)
+	md5Byte := md5.Sum(img)
+	md5str := fmt.Sprintf("%x", md5Byte)
+	w.Header().Add("Md5", md5str)
+	w.Write([]byte(img))
+
+}
+
+/*
+curl -H "Content-Type:text/plain" --data-binary @./main.go http://192.168.56.1:8377/setclip
+*/
+func SetClip(w http.ResponseWriter, req *http.Request) {
+
+	w.Write([]byte("write begin "))
+	bodyText, _ := ioutil.ReadAll(req.Body)
+	err := clip.WriteAll(string(bodyText))
+	if err != nil {
+		w.Write([]byte("write err"))
+		return
 	}
-	stdin.Close()
-	if err = cmd.Wait(); err != nil {
-		fmt.Println("Error wait:", err)
+	w.Write([]byte(bodyText))
+
+}
+
+/*
+curl http://192.168.56.1:8377/openurl -d '{"url":"https://www.baidu.com"}' -X POST -H "Content-Type:application/json"
+*/
+func OpenUrl(w http.ResponseWriter, req *http.Request) {
+	d := json.NewDecoder(req.Body)
+	d.DisallowUnknownFields()
+	t := struct {
+		Url string `json:"url"`
+	}{}
+	err := d.Decode(&t)
+	if err != nil {
+		w.Write([]byte("write err"))
+		return
 	}
+	url := t.Url
+	w.Write([]byte(url))
+	go open.Run(url)
 }
