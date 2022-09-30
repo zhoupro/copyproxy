@@ -21,6 +21,10 @@ curl  192.168.56.1:8090/getimg  -o test.png
 ```bash
 curl http://192.168.56.1:8377/openurl -d '{"url":"https://www.baidu.com"}' -X POST -H "Content-Type:application/json"
 ```
+### sync clip command
+```
+ropreate -h 192.168.56.1
+```
 
 ## thoughs from repos
 [clipper](https://github.com/wincent/clipper)
