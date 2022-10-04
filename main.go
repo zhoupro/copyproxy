@@ -42,6 +42,9 @@ func syncCopyToRemote() {
 	for {
 		time.Sleep(2000 * time.Millisecond)
 		curCopyStr, _ := clip.ReadAll()
+		if curCopyStr == "" {
+			continue
+		}
 		fmt.Println(curCopyStr)
 		curCopyStrMd5 := Md5Str([]byte(curCopyStr))
 		if lastSendedMd5Str != "" && lastSendedMd5Str == curCopyStrMd5 {
